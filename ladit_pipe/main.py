@@ -6,14 +6,14 @@ from pathlib import Path
 from ladit_pipe.pipeline import execute_pipeline
 
 # ロギング設定
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("transcription.log"),
-        logging.StreamHandler(),
-    ],
-)
+def setup_logging(verbose: bool):
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - [%(levelname)s] - %(message)s',
+        stream=sys.stdout
+    )
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,9 +49,17 @@ def main():
         choices=["meeting", "walking"],
         help="処理プリセット (meeting/walking)",
     )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="デバッグレベルの詳細なログを出力する"
+    )
 
     args = parser.parse_args()
-
+    
+    # logging設定を呼び出す
+    setup_logging(args.verbose)
+    
     # 出力ディレクトリ作成
     args.output.mkdir(parents=True, exist_ok=True)
 

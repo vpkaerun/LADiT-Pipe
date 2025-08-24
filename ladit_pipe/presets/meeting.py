@@ -1,4 +1,5 @@
 import logging
+from tqdm import tqdm
 from pathlib import Path
 import argparse
 import tempfile
@@ -168,7 +169,7 @@ def run(args: argparse.Namespace):
         logger.info("話者ごとの音声セグメントを収集します。")
         speaker_audio_segments: Dict[str, AudioSegment] = {}
 
-        for i, diarization_output in enumerate(diarization_results_per_chunk):
+        for i, diarization_output in enumerate(tqdm(diarization_results_per_chunk, desc="Collecting speaker segments")):
             chunk_info = all_long_chunks_info[i]
             chunk_audio = AudioSegment.from_wav(chunk_info["chunk_path"])
             
@@ -187,7 +188,7 @@ def run(args: argparse.Namespace):
         global_timeline = []
         whisper_model = whisper.load_model(args.whisper_model, device=args.device)
 
-        for speaker, full_audio in speaker_audio_segments.items():
+        for speaker, full_audio in tqdm(speaker_audio_segments.items(), desc="Transcribing speakers"):
             speaker_wav_path = temp_dir / f"speaker_{speaker}.wav"
             full_audio.export(speaker_wav_path, format="wav")
             
@@ -232,6 +233,6 @@ def run(args: argparse.Namespace):
     finally:
         # 一時ディレクトリのクリーンアップ
         shutil.rmtree(temp_dir)
-        logger.info(f"一時ディレクトリ {temp_dir} を削除しました。")
+        logger.debug(f"一時ディレクトリ {temp_dir} を削除しました。")
 
     logger.info("Meeting preset processing finished.")
