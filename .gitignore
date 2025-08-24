@@ -32,7 +32,7 @@ MANIFEST
 *.db
 
 # Output files
-output*/
+output/
 output/
 
 # Editor backups
