@@ -62,7 +62,9 @@ def _find_best_speaker(
     # 重複の多い話者を特定
     overlapping_speakers = []
 
-    for turn, _, speaker_label in diarization.itertracks(yield_label=True):
+    for turn, _, speaker_label in diarization.itertracks(
+        yield_label=True
+    ):
         # 重複時間を計算
         overlap_start = max(turn.start, relative_start)
         overlap_end = min(turn.end, relative_end)
@@ -74,13 +76,17 @@ def _find_best_speaker(
     if overlapping_speakers:
         # 最大重複時間の話者を選択
         best_speaker, max_overlap, _ = max(overlapping_speakers, key=lambda x: x[1])
-        return speaker_mapping.get(best_speaker, f"SPEAKER_{best_speaker}")
+        return speaker_mapping.get(
+            best_speaker, f"SPEAKER_{best_speaker}"
+        )
 
     # 重複がない場合、最も近い話者を選択
     closest_speaker = None
     min_distance = float("inf")
 
-    for turn, _, speaker_label in diarization.itertracks(yield_label=True):
+    for turn, _, speaker_label in diarization.itertracks(
+        yield_label=True
+    ):
         # セグメント中心からの距離を計算
         turn_center = turn.start + turn.duration / 2
         distance = abs(segment_center - turn_center)
@@ -90,7 +96,9 @@ def _find_best_speaker(
             closest_speaker = speaker_label
 
     if closest_speaker:
-        return speaker_mapping.get(closest_speaker, f"SPEAKER_{closest_speaker}")
+        return speaker_mapping.get(
+            closest_speaker, f"SPEAKER_{closest_speaker}"
+        )
 
     return "SPEAKER_UNKNOWN"
 
@@ -137,6 +145,7 @@ def _merge_consecutive_segments(segments: List[Dict]) -> List[Dict]:
     merged.append(current_segment)
 
     return merged
+
 
 # ロガー設定
 logger = logging.getLogger(__name__)
@@ -265,7 +274,9 @@ def merge_results(
 
     # まず全チャンクから話者情報を収集
     for transcription, diarization, chunk_start, chunk_end in chunk_results:
-        for turn, _, speaker_label in diarization.itertracks(yield_label=True):
+        for turn, _, speaker_label in diarization.itertracks(
+        yield_label=True
+    ):
             all_speakers.add(speaker_label)
 
     logger.info(f"検出された話者: {sorted(all_speakers)}")
@@ -317,8 +328,8 @@ def merge_results(
 
     # VTT 形式
     vtt_file = output_dir / f"{base_name}.vtt"
-    _write_vtt_output(merged_segments, output_file)
-    output_files["vtt"] = {}
+    _write_vtt_output(merged_segments, vtt_file)
+    output_files["vtt"] = vtt_file
 
     return output_files
 
