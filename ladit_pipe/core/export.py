@@ -14,7 +14,6 @@ from pyannote.core import Annotation, Segment
 # ロガー設定
 logger = logging.getLogger(__name__)
 
-
 def merge_and_export_results(
     final_timeline: List[Dict],
     output_dir: Path,
@@ -25,36 +24,7 @@ def merge_and_export_results(
     merged_segments = []
     all_speakers: Set[str] = set()
 
-    # 話者情報収集
-    for turn, _, speaker_label in global_diarization.itertracks(yield_label=True):
-        all_speakers.add(speaker_label)
-
-    logger.info(f"検出された話者: {sorted(list(all_speakers))}")
-
-    # 話者ラベルの正規化
-    speaker_mapping = _create_speaker_mapping(all_speakers)
-    logger.info(f"話者マッピング: {speaker_mapping}")
-
-    # Whisperのセグメントと話者情報をマージ
-    for result in transcription_results:
-        start_time = result["start"]
-        end_time = result["end"]
-        text = result["text"].strip()
-
-        if not text:
-            continue
-
-        # 該当時間の話者を特定
-        speaker = _find_best_speaker_global(
-            global_diarization, start_time, end_time, speaker_mapping
-        )
-
-        merged_segments.append(
-            {"start": start_time, "end": end_time, "text": text, "speaker": speaker}
-        )
-
-    # 時間順でソート
-    merged_segments.sort(key=lambda x: x["start"])
+    
 
     # 同一話者の連続セグメントを統合
     # 出力ファイル生成

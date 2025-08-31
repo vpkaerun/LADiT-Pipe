@@ -36,7 +36,7 @@ def run(args: argparse.Namespace):
     logger.debug(f"一時ディレクトリ: {temp_dir}")
 
     try:
-        input_file = args.input_files[0]
+        input_file = args.input
         logger.info(f"入力ファイル: {input_file.name}")
 
         # --- ステップ 1: WAV変換 ---
