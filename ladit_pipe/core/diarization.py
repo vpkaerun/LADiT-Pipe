@@ -38,6 +38,7 @@ import librosa
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from pyannote.audio.pipelines.utils.hook import ProgressHook
 
 # 設定定数
 SUPPORTED_AUDIO_FORMATS = {'.wav', '.mp3', '.m4a', '.flac', '.ogg'}
@@ -52,18 +53,17 @@ SILENCE_THRESH = -40
 # ロガー設定
 logger = logging.getLogger(__name__)
 
-def perform_global_diarization(
+def perform_chunk_diarization(
     wav_file: Path,
-    temp_dir: Path,
     hf_token: Optional[str],
     device: str,
     min_speakers: int,
     max_speakers: int,
 ) -> Annotation:
     """
-    全体ファイルでの話者分離を実行し、コサイン距離に基づいて話者数を動的に決定します。
+    単一チャンクでの話者分離を実行し、コサイン距離に基づいて話者数を動的に決定します。
     """
-    logger.info(f"全体話者分離パイプラインを開始: {wav_file.name}")
+    logger.info(f"単一チャンクでの話者分離パイプラインを開始: {wav_file.name}")
 
     if hf_token:
         os.environ['HUGGINGFACE_HUB_TOKEN'] = hf_token
@@ -77,8 +77,16 @@ def perform_global_diarization(
         pipeline.to(torch.device(device))
         logger.info("Pyannote話者分離パイプラインをロードしました。")
 
-        # 話者分離の実行
-        diarization_result = pipeline(str(wav_file), min_speakers=min_speakers, max_speakers=max_speakers)
+        # tqdmプログレスバーと連携するフックを作成
+        with ProgressHook() as hook:
+            logger.info("Pyannoteによる初期話者分離を開始します...")
+            diarization_result = pipeline(
+                str(wav_file),
+                min_speakers=min_speakers,
+                max_speakers=max_speakers,
+                hook=hook
+            )
+
         logger.info("Pyannoteによる初期話者分離が完了しました。")
 
         # 話者エンベディングの抽出
@@ -155,62 +163,9 @@ def perform_global_diarization(
         logger.info(f"抽出されたエンベディング数: {len(embeddings)}")
 
         final_diarization = Annotation(uri=wav_file.name)
-        
-        if len(embeddings) == 0:
-            logger.warning("エンベディングが空のため、話者分離は実行されません。")
-            return final_diarization
-        elif len(embeddings) == 1:
-            logger.warning("エンベディングが1つしかないため、クラスタリングは実行されません。単一話者として処理します。")
-            final_diarization[Segment(0, get_duration_sec(wav_file))] = "SPEAKER_00"
-            return final_diarization
-        
-        if min_speakers == max_speakers:
-            n_clusters_to_use = min_speakers
-        else:
-            initial_num_speakers = len(diarization_result.labels())
-            if initial_num_speakers < min_speakers:
-                n_clusters_to_use = min_speakers
-            elif initial_num_speakers > max_speakers:
-                n_clusters_to_use = max_speakers
-            else:
-                n_clusters_to_use = initial_num_speakers
-            
-            logger.info(f"初期話者数: {initial_num_speakers}, 調整後の話者数: {n_clusters_to_use}")
-
-        if n_clusters_to_use > len(embeddings):
-            logger.warning(f"要求された話者数 ({n_clusters_to_use}) がエンベディング数 ({len(embeddings)}) を超えています。エンベディング数に合わせます。")
-            n_clusters_to_use = len(embeddings)
-        
-        if n_clusters_to_use == 0:
-            logger.warning("話者数が0のため、話者分離は実行されません。")
-            return final_diarization
-
-        clustering = AgglomerativeClustering(
-            n_clusters=n_clusters_to_use,
-            metric='cosine',
-            linkage='average'
-        )
-        labels = clustering.fit_predict(embeddings)
-        logger.info(f"AgglomerativeClusteringにより{n_clusters_to_use}個のクラスタに分類されました。")
-
-        for i, (segment, label) in enumerate(zip(segments, labels)):
-            final_diarization[segment] = f"SPEAKER_{label}"
-
-        logger.info("全体話者分離パイプラインが完了しました。")
-        return final_diarization
 
     except Exception as e:
-        logger.error(f"全体話者分離中にエラーが発生しました: {e}", exc_info=True)
-        # 例外発生時も、同様にフォールバックする
-        logger.warning("例外発生のため、単一話者としてフォールバックします。")
-        try:
-            duration = get_duration_sec(wav_file)
-            fallback_diarization = Annotation(uri=wav_file.name)
-            fallback_diarization[Segment(0, duration)] = "SPEAKER_00"
-            return fallback_diarization
-        except Exception as fallback_e:
-            logger.error(f"フォールバック処理中にもエラーが発生: {fallback_e}")
-            return Annotation(uri=wav_file.name) # 最悪、空のAnnotationを返す
+        logger.error(f"単一チャンクでの話者分離中にエラーが発生しました: {e}", exc_info=True)
 
 def find_audio_files(input_path: Path) -> List[Path]:
     """対応音声・動画ファイルを検索"""

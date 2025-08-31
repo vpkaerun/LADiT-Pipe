@@ -15,13 +15,12 @@ from pyannote.core import Annotation, Segment
 logger = logging.getLogger(__name__)
 
 
-def merge_results(
-    transcription_results: List[Dict],
-    global_diarization: Annotation,
+def merge_and_export_results(
+    final_timeline: List[Dict],
     output_dir: Path,
     session_name: str,
 ) -> Dict[str, Path]:
-    """結果をマージして出力ファイル生成（改良版）"""
+    """最終結果をマージして出力ファイル生成"""
 
     merged_segments = []
     all_speakers: Set[str] = set()
@@ -58,83 +57,33 @@ def merge_results(
     merged_segments.sort(key=lambda x: x["start"])
 
     # 同一話者の連続セグメントを統合
-    merged_segments = _merge_consecutive_segments(merged_segments)
-
-    if not merged_segments:
-        logger.warning(f"セッション '{session_name}' に有効な文字起こしセグメントが見つかりませんでした。空のファイルを出力します。")
-
-
     # 出力ファイル生成
     output_files = {}
 
     # 必ず空でもファイルを出力
     txt_file = output_dir / f"{session_name}.txt"
-    _write_txt_output(merged_segments, txt_file)
+    _write_txt_output(final_timeline, txt_file)
     output_files["txt"] = txt_file
 
     srt_file = output_dir / f"{session_name}.srt"
-    _write_srt_output(merged_segments, srt_file)
+    _write_srt_output(final_timeline, srt_file)
     output_files["srt"] = srt_file
 
     vtt_file = output_dir / f"{session_name}.vtt"
-    _write_vtt_output(merged_segments, vtt_file)
+    _write_vtt_output(final_timeline, vtt_file)
     output_files["vtt"] = vtt_file
 
     # --- ここから追加 ---
     csv_file = output_dir / f"{session_name}.csv"
-    _write_csv_output(merged_segments, csv_file)
+    _write_csv_output(final_timeline, csv_file)
     output_files["csv"] = csv_file
 
     json_file = output_dir / f"{session_name}.json"
-    _write_json_output(merged_segments, json_file)
+    _write_json_output(final_timeline, json_file)
     output_files["json"] = json_file
     # --- ここまで追加 ---
 
     return output_files
-
-
-def _create_speaker_mapping(all_speakers: Set[str]) -> Dict[str, str]:
-    """話者ラベルの正規化マッピング作成"""
-    mapping = {}
-    speaker_counter = 0
-
-    sorted_speakers = sorted(list(all_speakers))
-
-    for original_label in sorted_speakers:
-        mapping[original_label] = f"SPEAKER_{speaker_counter}"
-        speaker_counter += 1
-
-    return mapping
-
-
-def _find_best_speaker_global(
-    diarization: Annotation, start_time: float, end_time: float, speaker_mapping: Dict[str, str]
-) -> str:
-    """グローバル話者分離結果から最適な話者を特定"""
-    segment_center = start_time + (end_time - start_time) / 2
-    overlapping_speakers = []
-
-    for turn, _, speaker_label in diarization.itertracks(yield_label=True):
-        overlap_start = max(turn.start, start_time)
-        overlap_end = min(turn.end, end_time)
-        overlap_duration = max(0, overlap_end - overlap_start)
-        if overlap_duration > 0:
-            overlapping_speakers.append((speaker_label, overlap_duration))
-
-    if overlapping_speakers:
-        best_speaker, _ = max(overlapping_speakers, key=lambda x: x[1])
-        return speaker_mapping.get(best_speaker, f"SPEAKER_{best_speaker}")
-
-    closest_speaker = None
-    min_distance = float("inf")
-    for turn, _, speaker_label in diarization.itertracks(yield_label=True):
-        turn_center = turn.start + turn.duration / 2
-        distance = abs(segment_center - turn_center)
-        if distance < min_distance:
-            min_distance = distance
-            closest_speaker = speaker_label
-
-    return speaker_mapping.get(closest_speaker, "SPEAKER_UNKNOWN") if closest_speaker else "SPEAKER_UNKNOWN"
 
 
 def _merge_consecutive_segments(segments: List[Dict]) -> List[Dict]:

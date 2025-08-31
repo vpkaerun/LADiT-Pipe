@@ -79,18 +79,15 @@ def _split_by_time(audio: AudioSegment, chunk_length_ms: int) -> List[AudioSegme
     return chunks
 
 
-def transcribe_chunk(chunk_file: Path, whisper_model: whisper.Whisper) -> dict:
-    """チャンクの文字起こし"""
+def transcribe_chunk_with_segments(chunk_file: Path, whisper_model: whisper.Whisper) -> List[Dict]:
+    """チャンクの文字起こしを行い、セグメントのリストを返します。"""
     # テスト環境変数 'LADIT_PIPE_TESTING' が設定されている場合、モックデータを返す
     if os.environ.get("LADIT_PIPE_TESTING"):
         logger.info(f"テストモード: {chunk_file.name} のダミー文字起こし結果を返します。")
-        return {
-            "text": "これはテスト用の文字起こしです。",
-            "segments": [
+        return  [
                 {"start": 0.5, "end": 4.5, "text": "これはテスト用の"},
                 {"start": 5.0, "end": 9.5, "text": "文字起こしです。"},
-            ],
-        }
+            ]
 
     try:
         if torch.cuda.is_available():
@@ -111,8 +108,8 @@ def transcribe_chunk(chunk_file: Path, whisper_model: whisper.Whisper) -> dict:
         }
 
         result = whisper_model.transcribe(str(chunk_file), **options)
-        result = _post_process_transcription(result)
-        return result
+        segments = result["segments"]
+        return segments
     except Exception as e:
         logger.error(f"文字起こしエラー {chunk_file}: {e}")
         return {}
