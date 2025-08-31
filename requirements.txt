@@ -14,3 +14,5 @@ pytorch-lightning==2.5.2
 lightning==2.5.2
 tokenizers==0.21.4
 tiktoken==0.11.0
+pytest
+scikit-learn==1.5.1

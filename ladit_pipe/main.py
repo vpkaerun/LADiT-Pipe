@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+import os
 from pathlib import Path
 
 from ladit_pipe.pipeline import execute_pipeline
@@ -28,14 +29,14 @@ def main():
         help="出力ディレクトリ (デフォルト: output)",
     )
     parser.add_argument("--whisper-model", default="medium", help="Whisperモデル名")
-    parser.add_argument("--hf-token", help="Hugging Face トークン")
+    parser.add_argument("--hf-token", default=os.environ.get("HF_TOKEN"), help="Hugging Face トークン")
     parser.add_argument("--device", default="cuda", help="デバイス (cuda/cpu)")
     parser.add_argument("--resume", action="store_true", help="中断された処理を再開")
     parser.add_argument(
-        "--min-speakers", type=int, default=1, help="最小話者数 (デフォルト: 1)"
+        "--min-speakers", type=int, default=2, help="最小話者数 (デフォルト: 2)"
     )
     parser.add_argument(
-        "--max-speakers", type=int, default=3, help="最大話者数 (デフォルト: 3)"
+        "--max-speakers", type=int, default=10, help="最大話者数 (デフォルト: 10)"
     )
     parser.add_argument(
         "--sensitive",

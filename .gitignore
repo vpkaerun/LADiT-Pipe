@@ -31,8 +31,10 @@ MANIFEST
 *.sql
 *.db
 
+# Input Files
+input/
+
 # Output files
-output/
 output/
 
 # Editor backups
