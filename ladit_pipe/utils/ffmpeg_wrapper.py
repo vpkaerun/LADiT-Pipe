@@ -24,8 +24,10 @@ def get_duration_sec(file_path: Path) -> float:
         float: ファイルの再生時間（秒）。
 
     Raises:
-        subprocess.CalledProcessError: ffprobeコマンドが失敗した場合。
-        ValueError: 再生時間のパースに失敗した場合。
+        subprocess.CalledProcessError:
+            ffprobeコマンドが失敗した場合。
+        ValueError:
+            再生時間のパースに失敗した場合。
     """
     logger.info(f"Getting duration for {file_path.name}...")
     command = [
@@ -39,7 +41,9 @@ def get_duration_sec(file_path: Path) -> float:
         str(file_path),
     ]
     try:
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            command, check=True, capture_output=True, text=True
+        )
         duration_str = result.stdout.strip()
         duration = float(duration_str)
         logger.info(f"Duration for {file_path.name}: {duration:.2f} seconds.")
@@ -48,7 +52,9 @@ def get_duration_sec(file_path: Path) -> float:
         logger.error(f"ffprobe failed for {file_path.name}: {e.stderr}")
         raise
     except ValueError:
-        logger.error(f"Failed to parse duration from ffprobe output: {duration_str}")
+        logger.error(
+            f"Failed to parse duration from ffprobe output: {duration_str}"
+        )
         raise ValueError(f"Could not parse duration for {file_path.name}")
 
 
@@ -68,20 +74,38 @@ def split_into_chunks(
         List[Path]: 分割後のチャンクファイルのパスのリスト。
 
     Raises:
-        subprocess.CalledProcessError: ffmpegコマンドが失敗した場合。
+        subprocess.CalledProcessError:
+            ffmpegコマンドが失敗した場合。
     """
-    logger.info(f"Splitting {input_file.name} into {chunk_duration_sec}s chunks...")
+    logger.info(
+        f"Splitting {input_file.name} into {chunk_duration_sec}s chunks..."
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # まずffprobeでファイルの総再生時間を取得
     try:
-        total_duration_str = subprocess.check_output([
-            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1', str(input_file)
-        ]).decode('utf-8').strip()
+        total_duration_str = (
+            subprocess.check_output(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(input_file),
+                ]
+            )
+            .decode("utf-8")
+            .strip()
+        )
         total_duration_sec = float(total_duration_str)
     except (subprocess.CalledProcessError, ValueError) as e:
-        logger.warning(f"ファイルの再生時間取得に失敗: {e}。プログレスバーは表示されません。")
+        logger.warning(
+            f"ファイルの再生時間取得に失敗: {e}。"
+            "プログレスバーは表示されません。"
+        )
         total_duration_sec = None
 
     # 出力ファイル名のパターン (例: input_file_000.wav, input_file_001.wav)
@@ -97,10 +121,12 @@ def split_into_chunks(
         str(chunk_duration_sec),
         "-c",
         "copy",  # 再エンコードなしで高速に分割
-        "-y", # 既存ファイルを上書き
-        "-hide_banner", # 余計なバナー情報を非表示
-        "-loglevel", "error", # 通常のエラー以外のログを抑制
-        "-progress", "pipe:1", # 進捗をパイプに出力
+        "-y",  # 既存ファイルを上書き
+        "-hide_banner",  # 余計なバナー情報を非表示
+        "-loglevel",
+        "error",  # 通常のエラー以外のログを抑制
+        "-progress",
+        "pipe:1",  # 進捗をパイプに出力
         str(output_pattern),
     ]
 
@@ -108,15 +134,15 @@ def split_into_chunks(
     progress_bar = tqdm(
         total=int(total_duration_sec) if total_duration_sec else None,
         desc=f"Splitting {input_file.name}",
-        unit="s"
+        unit="s",
     )
 
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, # stdoutとstderrを統合
+        stderr=subprocess.STDOUT,  # stdoutとstderrを統合
         universal_newlines=True,
-        encoding='utf-8'
+        encoding="utf-8",
     )
 
     for line in process.stdout:
@@ -125,14 +151,14 @@ def split_into_chunks(
             match = re.search(r"out_time_ms=(\d+)", line)
             if not match:
                 match = re.search(r"out_time=(.+)", line)
-            
+
             if match:
-                if ':' in match.group(1): # HH:MM:SS.ms 形式
-                    h, m, s = map(float, match.group(1).split(':'))
+                if ":" in match.group(1):  # HH:MM:SS.ms 形式
+                    h, m, s = map(float, match.group(1).split(":"))
                     processed_sec = h * 3600 + m * 60 + s
-                else: # マイクロ秒形式
+                else:  # マイクロ秒形式
                     processed_sec = int(match.group(1)) / 1_000_000
-                
+
                 # プログレスバーを更新
                 progress_bar.update(int(processed_sec) - progress_bar.n)
 
@@ -144,7 +170,8 @@ def split_into_chunks(
         raise subprocess.CalledProcessError(process.returncode, cmd)
 
     logger.info(
-        f"Successfully split {input_file.name} into chunks in {output_dir.name}"
+        f"Successfully split {input_file.name} into chunks "
+        f"in {output_dir.name}"
     )
 
     # 生成されたチャンクファイルのパスを収集
@@ -168,7 +195,8 @@ def extract_clip(
         Path: 切り出された音声クリップのパス。
 
     Raises:
-        subprocess.CalledProcessError: ffmpegコマンドが失敗した場合。
+        subprocess.CalledProcessError:
+            ffmpegコマンドが失敗した場合。
     """
     logger.info(
         f"Extracting clip from {input_file.name} ({start_sec:.2f}s - {end_sec:.2f}s) to {output_file.name}..."
@@ -194,12 +222,16 @@ def extract_clip(
         logger.info(f"Successfully extracted clip to {output_file.name}")
         return output_file
     except subprocess.CalledProcessError as e:
-        logger.error(f"ffmpeg clip extraction failed for {input_file.name}: {e.stderr}")
+        logger.error(
+            f"ffmpeg clip extraction failed for {input_file.name}: {e.stderr}"
+        )
         raise
 
 
 # 【プログレスバー対応版】
-def convert_to_wav(input_file: Path, temp_dir: Path) -> Path:
+def convert_to_wav(
+    input_file: Path, temp_dir: Path
+) -> Path:
     """
     任意の音声・動画ファイルを16kHzモノラルのWAVファイルに変換する。
     変換の進捗をプログレスバーで表示する。
@@ -207,45 +239,69 @@ def convert_to_wav(input_file: Path, temp_dir: Path) -> Path:
     output_file = temp_dir / f"{input_file.stem}_converted.wav"
 
     if output_file.exists():
-        logger.info(f"変換済みファイルが既に存在するためスキップ: {output_file.name}")
+        logger.info(
+            f"変換済みファイルが既に存在するためスキップ: {output_file.name}"
+        )
         return output_file
 
     try:
         # まずffprobeでファイルの総再生時間を取得
-        total_duration_str = subprocess.check_output([
-            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1', str(input_file)
-        ]).decode('utf-8').strip()
+        total_duration_str = (
+            subprocess.check_output(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(input_file),
+                ]
+            )
+            .decode("utf-8")
+            .strip()
+        )
         total_duration_sec = float(total_duration_str)
     except (subprocess.CalledProcessError, ValueError) as e:
-        logger.warning(f"ファイルの再生時間取得に失敗: {e}。プログレスバーは表示されません。")
+        logger.warning(
+            f"ファイルの再生時間取得に失敗: {e}。"
+            "プログレスバーは表示されません。"
+        )
         total_duration_sec = None
 
     cmd = [
-        'ffmpeg', '-i', str(input_file),
-        '-ar', str(TARGET_SAMPLE_RATE),
-        '-ac', '1',
-        '-c:a', 'pcm_s16le',
-        '-y',
-        '-hide_banner', # 余計なバナー情報を非表示
-        '-loglevel', 'error', # 通常のエラー以外のログを抑制
-        '-progress', 'pipe:1', # 進捗をパイプに出力
-        str(output_file)
+        "ffmpeg",
+        "-i",
+        str(input_file),
+        "-ar",
+        str(TARGET_SAMPLE_RATE),
+        "-ac",
+        "1",
+        "-c:a",
+        "pcm_s16le",
+        "-y",
+        "-hide_banner",  # 余計なバナー情報を非表示
+        "-loglevel",
+        "error",  # 通常のエラー以外のログを抑制
+        "-progress",
+        "pipe:1",  # 進捗をパイプに出力
+        str(output_file),
     ]
 
     # tqdmプログレスバーの設定
     progress_bar = tqdm(
         total=int(total_duration_sec) if total_duration_sec else None,
         desc=f"Converting {input_file.name}",
-        unit="s"
+        unit="s",
     )
 
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, # stdoutとstderrを統合
+        stderr=subprocess.STDOUT,  # stdoutとstderrを統合
         universal_newlines=True,
-        encoding='utf-8'
+        encoding="utf-8",
     )
 
     for line in process.stdout:
@@ -254,14 +310,14 @@ def convert_to_wav(input_file: Path, temp_dir: Path) -> Path:
             match = re.search(r"out_time_ms=(\d+)", line)
             if not match:
                 match = re.search(r"out_time=(.+)", line)
-            
+
             if match:
-                if ':' in match.group(1): # HH:MM:SS.ms 形式
-                    h, m, s = map(float, match.group(1).split(':'))
+                if ":" in match.group(1):  # HH:MM:SS.ms 形式
+                    h, m, s = map(float, match.group(1).split(":"))
                     processed_sec = h * 3600 + m * 60 + s
-                else: # マイクロ秒形式
+                else:  # マイクロ秒形式
                     processed_sec = int(match.group(1)) / 1_000_000
-                
+
                 # プログレスバーを更新
                 progress_bar.update(int(processed_sec) - progress_bar.n)
 
@@ -276,7 +332,13 @@ def convert_to_wav(input_file: Path, temp_dir: Path) -> Path:
     logger.info(f"変換完了: {input_file.name} -> {output_file.name}")
     return output_file
 
-def convert_to_wav_with_progress(input_file: Path, temp_dir: Path, output_file: Optional[Path] = None, sample_rate: int = 16000) -> Path:
+
+def convert_to_wav_with_progress(
+    input_file: Path,
+    temp_dir: Path,
+    output_file: Optional[Path] = None,
+    sample_rate: int = 16000,
+) -> Path:
     """
     ffmpegで音声ファイルを16kHzモノラルWAVに変換し、進捗をtqdmで表示する。
     """
@@ -289,18 +351,34 @@ def convert_to_wav_with_progress(input_file: Path, temp_dir: Path, output_file: 
     cmd = [
         "ffmpeg",
         "-y",
-        "-i", str(input_file),
-        "-ar", str(sample_rate),
-        "-ac", "1",
-        "-c:a", "pcm_s16le",
-        "-progress", "pipe:1",
-        str(output_file)
+        "-i",
+        str(input_file),
+        "-ar",
+        str(sample_rate),
+        "-ac",
+        "1",
+        "-c:a",
+        "pcm_s16le",
+        "-progress",
+        "pipe:1",
+        str(output_file),
     ]
 
     progress_re = re.compile(r"out_time_ms=(\d+)")
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    p = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
 
-    pbar = tqdm(total=duration, unit="sec", desc=f"Converting {input_file.name}", leave=False)
+    pbar = tqdm(
+        total=duration,
+        unit="sec",
+        desc=f"Converting {input_file.name}",
+        leave=False,
+    )
     last_sec = 0
     try:
         for line in p.stdout:
@@ -334,13 +412,14 @@ def concatenate_files(input_files: List[Path], output_file: Path) -> Path:
         Path: 連結されたWAVファイルのパス。
 
     Raises:
-        subprocess.CalledProcessError: ffmpegコマンドが失敗した場合。
+        subprocess.CalledProcessError:
+            ffmpegコマンドが失敗した場合。
         ValueError: 入力ファイルが指定されていない場合。
     """
     if not input_files:
         raise ValueError("連結する入力ファイルが指定されていません。")
 
-    logger.info(f"Concatenating {len(input_files)} files to {output_file.name}...")
+    logger.info(f"{len(input_files)}個のファイルを連結します。ファイルのサイズによっては、時間がかかる場合があります...")
 
     # ffmpegのconcatデムーサーを使用するためのファイルリストを作成
     resolved_paths = []
@@ -374,7 +453,7 @@ def concatenate_files(input_files: List[Path], output_file: Path) -> Path:
         logger.error(f"ffmpeg concatenation failed: {e.stderr}")
         raise
     except Exception as e:
-        logger.error(f"Error during file concatenation: {e}")
+        logger.error(f"Error during file concatenation: {e}\n")
         raise
 
 
@@ -393,10 +472,12 @@ def split_into_chunks_with_progress(
         List[Path]: 分割後のチャンクファイルのパスのリスト。
 
     Raises:
-        subprocess.CalledProcessError: ffmpegコマンドが失敗した場合。
+        subprocess.CalledProcessError:
+            ffmpegコマンドが失敗した場合。
     """
     logger.info(
-        f"Splitting {input_file.name} into {chunk_duration_sec}s chunks with progress..."
+        f"Splitting {input_file.name} into {chunk_duration_sec}s chunks "
+        "with progress..."
     )
     output_dir = temp_dir / f"{input_file.stem}_chunks"
     output_dir.mkdir(exist_ok=True)
@@ -404,21 +485,28 @@ def split_into_chunks_with_progress(
 
     try:
         # まずffprobeでファイルの総再生時間を取得
-        total_duration_str = subprocess.check_output(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(input_file),
-            ]
-        ).decode("utf-8").strip()
+        total_duration_str = (
+            subprocess.check_output(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(input_file),
+                ]
+            )
+            .decode("utf-8")
+            .strip()
+        )
         total_duration_sec = float(total_duration_str)
     except (subprocess.CalledProcessError, ValueError) as e:
-        logger.warning(f"ファイルの再生時間取得に失敗: {e}。プログレスバーは表示されません。")
+        logger.warning(
+            f"ファイルの再生時間取得に失敗: {e}。"
+            "プログレスバーは表示されません。"
+        )
         total_duration_sec = None
 
     cmd = [
@@ -480,7 +568,8 @@ def split_into_chunks_with_progress(
         raise subprocess.CalledProcessError(process.returncode, cmd)
 
     logger.info(
-        f"Successfully split {input_file.name} into chunks in {output_dir.name}"
+        f"Successfully split {input_file.name} into chunks "
+        f"in {output_dir.name}"
     )
 
     chunk_files = sorted(list(output_dir.glob("*.wav")))
