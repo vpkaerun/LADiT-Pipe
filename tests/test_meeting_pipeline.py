@@ -9,10 +9,12 @@ from pydub.generators import Sine
 
 # ladit_pipeのパスをシステムパスに追加
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from ladit_pipe.pipeline import execute_pipeline
 from ladit_pipe.presets.meeting import convert_to_wav_with_progress
+
 
 @pytest.fixture
 def dummy_audio_file():
@@ -27,6 +29,7 @@ def dummy_audio_file():
     yield file_path
     shutil.rmtree(temp_dir)
 
+
 def test_convert_to_wav_with_progress(dummy_audio_file):
     """
     convert_to_wav_with_progress関数がプログレスバー付きでエラーなく実行されるかテスト
@@ -39,6 +42,7 @@ def test_convert_to_wav_with_progress(dummy_audio_file):
         except Exception as e:
             pytest.fail(f"convert_to_wav_with_progress failed with an exception: {e}")
 
+
 @pytest.fixture
 def test_wav_file():
     """
@@ -50,14 +54,27 @@ def test_wav_file():
     test_file_path = input_dir / "test.wav"
 
     if not test_file_path.exists():
-        print(f"'{test_file_path}' が見つからないため、ダミーの音声ファイルを生成します。")
+        print(
+            f"'{test_file_path}' が見つからないため、ダミーの音声ファイルを生成します。"
+        )
         # 10秒の音声を作成 (2話者)
-        tone1 = Sine(440).to_audio_segment(duration=5000).set_channels(1).set_frame_rate(16000)
-        tone2 = Sine(880).to_audio_segment(duration=5000).set_channels(1).set_frame_rate(16000)
+        tone1 = (
+            Sine(440)
+            .to_audio_segment(duration=5000)
+            .set_channels(1)
+            .set_frame_rate(16000)
+        )
+        tone2 = (
+            Sine(880)
+            .to_audio_segment(duration=5000)
+            .set_channels(1)
+            .set_frame_rate(16000)
+        )
         audio = tone1 + tone2
         audio.export(test_file_path, format="wav")
 
     yield test_file_path
+
 
 @pytest.fixture
 def output_dir():
@@ -68,6 +85,7 @@ def output_dir():
     temp_output_dir.mkdir(exist_ok=True)
     yield temp_output_dir
     shutil.rmtree(temp_output_dir)
+
 
 def test_meeting_pipeline_e2e(test_wav_file, output_dir):
     """
@@ -80,11 +98,12 @@ def test_meeting_pipeline_e2e(test_wav_file, output_dir):
             preset="meeting",
             input=test_wav_file,
             output=output_dir,
-            whisper_model="tiny", # テスト用に小さいモデルを使用
-            device="cpu", # テスト用にCPUを使用
-            hf_token=os.environ.get("HF_TOKEN", ""), # 環境変数からHF_TOKENを取得
+            whisper_model="tiny",  # テスト用に小さいモデルを使用
+            device="cpu",  # テスト用にCPUを使用
+            hf_token=os.environ.get("HF_TOKEN", ""),  # 環境変数からHF_TOKENを取得
             min_speakers=1,
             max_speakers=2,
+            diarization_threshold=0.5, # テスト用にデフォルト値を追加
             verbose=True,
         )
 

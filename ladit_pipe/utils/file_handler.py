@@ -47,11 +47,11 @@ def group_files_by_date(files: List[Path]) -> dict[str, List[Path]]:
     # ファイル名の先頭から日付パターンを検索
     for file_path in files:
         # YYYY-MM-DD, YYYYMMDD, YYYY_MM_DD などの形式にマッチ
-        match = re.search(r'(\d{4})[-_]?(\d{2})[-_]?(\d{2})', file_path.stem)
+        match = re.search(r"(\d{4})[-_]?(\d{2})[-_]?(\d{2})", file_path.stem)
         if match:
             year, month, day = match.groups()
             date_str = f"{year}-{month}-{day}"
-            
+
             if date_str not in grouped_files:
                 grouped_files[date_str] = []
             grouped_files[date_str].append(file_path)

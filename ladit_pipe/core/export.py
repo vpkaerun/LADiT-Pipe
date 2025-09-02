@@ -6,13 +6,44 @@
 import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict
 import json
-
-from pyannote.core import Annotation, Segment
 
 # ロガー設定
 logger = logging.getLogger(__name__)
+
+
+def assign_speakers_to_transcription_segments(
+    transcription_segments: List[Dict],
+    diarization_segments: List[Dict],
+) -> List[Dict]:
+    """
+    Transcription segmentsにdiarization結果から最適な話者を割り当てます。
+    """
+    final_timeline = []
+    for segment in transcription_segments:
+        best_speaker = "UNKNOWN_SPEAKER"
+        max_overlap = 0.0
+
+        for diar_entry in diarization_segments:
+            diar_start = diar_entry["start"]
+            diar_end = diar_entry["end"]
+            speaker = diar_entry["speaker"]
+
+            overlap_start = max(diar_start, segment["start"])
+            overlap_end = min(diar_end, segment["end"])
+            current_overlap = max(0.0, overlap_end - overlap_start)
+
+            if current_overlap > max_overlap:
+                max_overlap = current_overlap
+                best_speaker = speaker
+            elif current_overlap == max_overlap and current_overlap > 0:
+                pass  # 同じ重複の場合、既存のスピーカーを維持
+
+        segment["speaker"] = best_speaker
+        final_timeline.append(segment)
+    return final_timeline
+
 
 def merge_and_export_results(
     final_timeline: List[Dict],
@@ -20,11 +51,6 @@ def merge_and_export_results(
     session_name: str,
 ) -> Dict[str, Path]:
     """最終結果をマージして出力ファイル生成"""
-
-    merged_segments = []
-    all_speakers: Set[str] = set()
-
-    
 
     # 同一話者の連続セグメントを統合
     # 出力ファイル生成
@@ -63,7 +89,10 @@ def _merge_consecutive_segments(segments: List[Dict]) -> List[Dict]:
     merged = []
     current_segment = segments[0].copy()
     for next_segment in segments[1:]:
-        if current_segment["speaker"] == next_segment["speaker"] and next_segment["start"] - current_segment["end"] < 1.5:
+        if (
+            current_segment["speaker"] == next_segment["speaker"]
+            and next_segment["start"] - current_segment["end"] < 1.5
+        ):
             current_segment["end"] = next_segment["end"]
             current_segment["text"] += " " + next_segment["text"]
         else:
@@ -99,7 +128,10 @@ def _write_txt_output(segments: List[Dict], output_file: Path):
         for segment in segments:
             start_str = _format_timestamp(segment["start"])
             end_str = _format_timestamp(segment["end"])
-            f.write(f"[{start_str} - {end_str}] {segment['speaker']}: {segment['text']}\n")
+            f.write(
+                f"[{start_str} - {end_str}] "
+                f"{segment['speaker']}: {segment['text']}\n"
+            )
 
 
 def _write_srt_output(segments: List[Dict], output_file: Path):
@@ -129,7 +161,9 @@ def _write_csv_output(segments: List[Dict], output_file: Path):
     with open(output_file, "w", encoding="utf-8") as f:
         f.write("イベント名\n\nstart,end,speaker,text\n")
         for seg in segments:
-            f.write(f"{seg['start']},{seg['end']},{seg['speaker']},{seg['text']}\n")
+            f.write(
+                f"{seg['start']},{seg['end']},{seg['speaker']},{seg['text']}\n"
+            )
 
 
 def _write_json_output(segments: List[Dict], output_file: Path):

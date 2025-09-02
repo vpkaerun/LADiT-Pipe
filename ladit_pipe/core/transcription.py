@@ -23,7 +23,9 @@ MIN_SILENCE_LEN = 500
 SILENCE_THRESH = -40
 
 
-def create_transcription_chunks(wav_file: Path, temp_dir: Path) -> List[Tuple[Path, float, float]]:
+def create_transcription_chunks(
+    wav_file: Path, temp_dir: Path
+) -> List[Tuple[Path, float, float]]:
     """文字起こし用の小さなチャンク作成"""
     logger.info(f"文字起こし用チャンク作成: {wav_file.name}")
 
@@ -37,7 +39,7 @@ def create_transcription_chunks(wav_file: Path, temp_dir: Path) -> List[Tuple[Pa
             audio,
             min_silence_len=MIN_SILENCE_LEN,
             silence_thresh=SILENCE_THRESH,
-            keep_silence=200
+            keep_silence=200,
         )
 
         current_time = 0.0
@@ -48,7 +50,9 @@ def create_transcription_chunks(wav_file: Path, temp_dir: Path) -> List[Tuple[Pa
             if chunk_duration > CHUNK_LENGTH_MS * 2:
                 sub_chunks = _split_by_time(chunk, CHUNK_LENGTH_MS)
                 for j, sub_chunk in enumerate(sub_chunks):
-                    sub_chunk_file = temp_dir / f"{wav_file.stem}_chunk_{i}_{j}.wav"
+                    sub_chunk_file = (
+                        temp_dir / f"{wav_file.stem}_chunk_{i}_{j}.wav"
+                    )
                     sub_chunk.export(sub_chunk_file, format="wav")
 
                     start_time = current_time
@@ -70,24 +74,32 @@ def create_transcription_chunks(wav_file: Path, temp_dir: Path) -> List[Tuple[Pa
     return chunks_info
 
 
-def _split_by_time(audio: AudioSegment, chunk_length_ms: int) -> List[AudioSegment]:
+def _split_by_time(
+    audio: AudioSegment, chunk_length_ms: int
+) -> List[AudioSegment]:
     """時間ベースでオーディオを分割"""
     chunks = []
     for i in range(0, len(audio), chunk_length_ms):
-        chunk = audio[i:i + chunk_length_ms]
+        chunk = audio[i : i + chunk_length_ms]
         chunks.append(chunk)
     return chunks
 
 
-def transcribe_chunk_with_segments(chunk_file: Path, whisper_model: whisper.Whisper) -> List[Dict]:
+def transcribe_chunk_with_segments(
+    chunk_file: Path, whisper_model: whisper.Whisper
+) -> List[Dict]:
     """チャンクの文字起こしを行い、セグメントのリストを返します。"""
-    # テスト環境変数 'LADIT_PIPE_TESTING' が設定されている場合、モックデータを返す
+    # テスト環境変数 'LADIT_PIPE_TESTING' が設定されている場合、
+    # モックデータを返す
     if os.environ.get("LADIT_PIPE_TESTING"):
-        logger.info(f"テストモード: {chunk_file.name} のダミー文字起こし結果を返します。")
-        return  [
-                {"start": 0.5, "end": 4.5, "text": "これはテスト用の"},
-                {"start": 5.0, "end": 9.5, "text": "文字起こしです。"},
-            ]
+        logger.info(
+            f"テストモード: {chunk_file.name} の"
+            "ダミー文字起こし結果を返します。"
+        )
+        return [
+            {"start": 0.5, "end": 4.5, "text": "これはテスト用の"},
+            {"start": 5.0, "end": 9.5, "text": "文字起こしです。"},
+        ]
 
     try:
         if torch.cuda.is_available():
@@ -139,7 +151,7 @@ def _post_process_transcription(result: Dict) -> Dict:
 def _remove_repetitions(text: str) -> str:
     """繰り返しパターンを除去"""
     # 同一単語の連続繰り返し除去
-    text = re.sub(r'(\S+?)(\1){2,}', r'\1', text)
+    text = re.sub(r"(\S+?)(\1){2,}", r"\1", text)
 
     words = text.split()
     if len(words) > 6:
@@ -147,16 +159,22 @@ def _remove_repetitions(text: str) -> str:
         cleaned_words = []
         while i < len(words):
             # 2語フレーズの繰り返しチェック
-            if i + 3 < len(words) and words[i:i+2] == words[i+2:i+4]:
-                cleaned_words.extend(words[i:i+2])
+            if i + 3 < len(words) and words[i : i + 2] == words[i + 2 : i + 4]:
+                cleaned_words.extend(words[i : i + 2])
                 j = i + 4
-                while j + 1 < len(words) and words[i:i+2] == words[j:j+2]:
+                while (
+                    j + 1 < len(words) and words[i : i + 2] == words[j : j + 2]
+                ):
                     j += 2
                 i = j
-            elif i + 5 < len(words) and words[i:i+3] == words[i+3:i+6]:
-                cleaned_words.extend(words[i:i+3])
+            elif (
+                i + 5 < len(words) and words[i : i + 3] == words[i + 3 : i + 6]
+            ):
+                cleaned_words.extend(words[i : i + 3])
                 j = i + 6
-                while j + 2 < len(words) and words[i:i+3] == words[j:j+3]:
+                while (
+                    j + 2 < len(words) and words[i : i + 3] == words[j : j + 3]
+                ):
                     j += 3
                 i = j
             else:
@@ -165,7 +183,7 @@ def _remove_repetitions(text: str) -> str:
 
         text = " ".join(cleaned_words)
 
-    text = re.sub(r'(\S)\1{4,}', r'\1', text)
+    text = re.sub(r"(\S)\1{4,}", r"\1", text)
     return text.strip()
 
 
@@ -173,73 +191,8 @@ def _is_meaningless_segment(text: str) -> bool:
     """意味のないセグメントかどうか判定"""
     if len(text.strip()) < 2:
         return True
-    if re.match(r'^(\S)\1*$', text.strip()):
+    if re.match(r"^(\S)\1*$", text.strip()):
         return True
-    if re.match(r'^[^\w\s]*$', text.strip()):
-        return True
-    return False
-
-
-def _post_process_transcription(result: Dict) -> Dict:
-    """転写結果の後処理"""
-    if "segments" not in result:
-        return result
-
-    processed_segments = []
-
-    for segment in result["segments"]:
-        text = segment.get("text", "").strip()
-        cleaned_text = _remove_repetitions(text)
-
-        if len(cleaned_text) > 0 and not _is_meaningless_segment(cleaned_text):
-            segment["text"] = cleaned_text
-            processed_segments.append(segment)
-
-    result["segments"] = processed_segments
-    result["text"] = " ".join([seg["text"] for seg in processed_segments])
-
-    return result
-
-
-def _remove_repetitions(text: str) -> str:
-    """繰り返しパターンを除去"""
-    # 同一単語の連続繰り返し除去
-    text = re.sub(r'(\S+?)(\1){2,}', r'\1', text)
-
-    words = text.split()
-    if len(words) > 6:
-        i = 0
-        cleaned_words = []
-        while i < len(words):
-            # 2語フレーズの繰り返しチェック
-            if i + 3 < len(words) and words[i:i+2] == words[i+2:i+4]:
-                cleaned_words.extend(words[i:i+2])
-                j = i + 4
-                while j + 1 < len(words) and words[i:i+2] == words[j:j+2]:
-                    j += 2
-                i = j
-            elif i + 5 < len(words) and words[i:i+3] == words[i+3:i+6]:
-                cleaned_words.extend(words[i:i+3])
-                j = i + 6
-                while j + 2 < len(words) and words[i:i+3] == words[j:j+3]:
-                    j += 3
-                i = j
-            else:
-                cleaned_words.append(words[i])
-                i += 1
-
-        text = " ".join(cleaned_words)
-
-    text = re.sub(r'(\S)\1{4,}', r'\1', text)
-    return text.strip()
-
-
-def _is_meaningless_segment(text: str) -> bool:
-    """意味のないセグメントかどうか判定"""
-    if len(text.strip()) < 2:
-        return True
-    if re.match(r'^(\S)\1*$', text.strip()):
-        return True
-    if re.match(r'^[^\w\s]*$', text.strip()):
+    if re.match(r"^[^\w\s]*$", text.strip()):
         return True
     return False
